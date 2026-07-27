@@ -23,7 +23,6 @@ import {
 import VocabularyLookup from './VocabularyLookup'
 
 const bundledQuestionBank = createLocalQuestionBank()
-
 const levelBookDetails: Record<TrainingLevel, { title: string; subtitle: string }> = {
   全部: { title: '混合卷', subtitle: '综合理解' },
   基础: { title: '基础册', subtitle: '读准主干' },
@@ -54,7 +53,18 @@ function App() {
     getQuestionIdsForLevel(bundledQuestionBank.questions, trainingLevel),
   )))
   const [libraryOpen, setLibraryOpen] = useState(false)
+  const [libraryClosing, setLibraryClosing] = useState(false)
+  const [pendingTrainingLevel, setPendingTrainingLevel] = useState<TrainingLevel | null>(null)
+  const [libraryTitleConfirming, setLibraryTitleConfirming] = useState(false)
+  const [questionExiting, setQuestionExiting] = useState(false)
+  const [vocabularyPanelOpen, setVocabularyPanelOpen] = useState(false)
   const [revealedVocabularyCount, setRevealedVocabularyCount] = useState(0)
+  const [vocabularyRevealBatch, setVocabularyRevealBatch] = useState({ start: 0, stagger: false })
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => (
+    typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false
+  ))
   const libraryTriggerRef = useRef<HTMLButtonElement>(null)
   const { questionById, vocabularyByQuestionId } = questionBank
   const selectedQuestionIds = useMemo(
@@ -98,13 +108,61 @@ function App() {
   }, [trainingLevel])
 
   useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const handleChange = (event: MediaQueryListEvent) => setPrefersReducedMotion(event.matches)
+
+    setPrefersReducedMotion(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [])
+
+  const applyTrainingLevel = useCallback((level: TrainingLevel) => {
+    if (level === activeTrainingLevel) return
+
+    const nextIds = getQuestionIdsForLevel(questionBank.questions, level)
+    if (nextIds.length === 0) return
+
+    setTrainingLevel(level)
+    setQuestionExiting(false)
+    setVocabularyPanelOpen(false)
+    setRevealedVocabularyCount(0)
+    setVocabularyRevealBatch({ start: 0, stagger: false })
+    setProgress(createProgress(nextIds))
+
+    if (prefersReducedMotion) return
+
+    setLibraryTitleConfirming(true)
+  }, [activeTrainingLevel, prefersReducedMotion, questionBank.questions])
+
+  const finishLibraryClose = useCallback((level: TrainingLevel | null) => {
+    setLibraryOpen(false)
+    setLibraryClosing(false)
+    setPendingTrainingLevel(null)
+    if (level !== null) applyTrainingLevel(level)
+    libraryTriggerRef.current?.focus()
+  }, [applyTrainingLevel])
+
+  const closeLibrary = useCallback(() => {
+    if (!libraryOpen || libraryClosing) return
+
+    if (prefersReducedMotion) {
+      finishLibraryClose(null)
+      return
+    }
+
+    setPendingTrainingLevel(null)
+    setLibraryClosing(true)
+  }, [finishLibraryClose, libraryClosing, libraryOpen, prefersReducedMotion])
+
+  useEffect(() => {
     if (!libraryOpen) return
 
     const previousOverflow = document.body.style.overflow
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
-      setLibraryOpen(false)
-      libraryTriggerRef.current?.focus()
+      closeLibrary()
     }
 
     document.body.style.overflow = 'hidden'
@@ -114,7 +172,7 @@ function App() {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleEscape)
     }
-  }, [libraryOpen])
+  }, [closeLibrary, libraryOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -137,7 +195,9 @@ function App() {
     const nextIds = nextLevel === '全部' ? questionBank.questionIds : matchingIds
 
     if (nextLevel !== trainingLevel) setTrainingLevel(nextLevel)
+    setVocabularyPanelOpen(false)
     setRevealedVocabularyCount(0)
+    setVocabularyRevealBatch({ start: 0, stagger: false })
     setProgress((current) => fitProgressToSession({
       ...normalizeProgress(current, nextIds),
       selectedIndex: null,
@@ -157,8 +217,10 @@ function App() {
     })
   }, [question.answer])
 
-  const nextQuestion = useCallback(() => {
+  const commitNextQuestion = useCallback(() => {
+    setVocabularyPanelOpen(false)
     setRevealedVocabularyCount(0)
+    setVocabularyRevealBatch({ start: 0, stagger: false })
     setProgress((current) => advanceProgress(
       current,
       questionIds,
@@ -166,6 +228,19 @@ function App() {
       SESSION_QUESTION_COUNT,
     ))
   }, [questionIds])
+
+  const nextQuestion = useCallback(() => {
+    if (questionExiting) return
+
+    setVocabularyPanelOpen(false)
+
+    if (prefersReducedMotion) {
+      commitNextQuestion()
+      return
+    }
+
+    setQuestionExiting(true)
+  }, [commitNextQuestion, prefersReducedMotion, questionExiting])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -197,28 +272,35 @@ function App() {
     if (!window.confirm('确认清空当前答题记录并重新开始吗？')) return
 
     clearProgress()
+    setLibraryOpen(false)
+    setLibraryClosing(false)
+    setPendingTrainingLevel(null)
+    setQuestionExiting(false)
+    setVocabularyPanelOpen(false)
     setRevealedVocabularyCount(0)
+    setVocabularyRevealBatch({ start: 0, stagger: false })
     setProgress(createProgress(questionIds))
   }
 
   const selectTrainingLevel = (level: TrainingLevel) => {
-    setLibraryOpen(false)
-    libraryTriggerRef.current?.focus()
-    if (level === activeTrainingLevel) return
+    if (libraryClosing) return
+    if (levelCounts[level] === 0) return
 
-    const nextIds = getQuestionIdsForLevel(questionBank.questions, level)
-    if (nextIds.length === 0) return
+    setPendingTrainingLevel(level)
 
-    setTrainingLevel(level)
-    setRevealedVocabularyCount(0)
-    setProgress(createProgress(nextIds))
+    if (prefersReducedMotion) {
+      finishLibraryClose(level)
+      return
+    }
   }
 
   const revealNextVocabulary = () => {
+    setVocabularyRevealBatch({ start: revealedVocabularyCount, stagger: false })
     setRevealedVocabularyCount((current) => Math.min(current + 1, vocabulary.length))
   }
 
   const revealAllVocabulary = () => {
+    setVocabularyRevealBatch({ start: revealedVocabularyCount, stagger: !prefersReducedMotion })
     setRevealedVocabularyCount(vocabulary.length)
   }
 
@@ -226,16 +308,8 @@ function App() {
     <>
       <a className="skip-link" href="#main-content">跳到题目</a>
       <div className="page-shell">
-        <header className="topbar">
-          <div className="brand-block">
-            <h1>看懂一句</h1>
-          </div>
-
-          <p className="key-guide" aria-label="使用 WASD 键作答">WASD</p>
-        </header>
-
         <main id="main-content">
-          <section className="library-control" aria-label="当前训练词库">
+          <div className="session-line">
             <button
               ref={libraryTriggerRef}
               className="library-trigger"
@@ -243,88 +317,116 @@ function App() {
               aria-expanded={libraryOpen}
               aria-haspopup="dialog"
               aria-label={`当前词库：${levelBookDetails[activeTrainingLevel].title}，${sessionQuestionCount}题，${sessionWordCount}词，选择词库`}
-              onClick={() => setLibraryOpen(true)}
+              onClick={() => {
+                setLibraryClosing(false)
+                setPendingTrainingLevel(null)
+                setLibraryOpen(true)
+              }}
             >
-              <span>
-                <small>当前词库</small>
-                <strong>{levelBookDetails[activeTrainingLevel].title}</strong>
-              </span>
-              <span className="library-trigger-meta">
-                每轮 {sessionQuestionCount} 题 · {sessionWordCount} 词
-              </span>
-              <span className="library-trigger-action">选择词库 <i aria-hidden="true">↗</i></span>
+              <strong
+                className={libraryTitleConfirming ? 'library-current-title-confirming' : ''}
+                onAnimationEnd={() => setLibraryTitleConfirming(false)}
+              >
+                {levelBookDetails[activeTrainingLevel].title}
+              </strong>
+              <span aria-hidden="true">⌄</span>
             </button>
-          </section>
+            <span className="session-progress">{progress.cursor + 1} / {sessionQuestionCount}</span>
+          </div>
 
-          <article className="question-sheet" aria-labelledby="question-prompt">
-            <div className="question-content" key={question.id}>
+          <article className="question-sheet" aria-label="英文理解选择题" aria-busy={questionExiting}>
+            <div
+              className={`question-content ${questionExiting ? 'question-content-exiting' : ''}`}
+              key={question.id}
+              onAnimationEnd={(event) => {
+                if (event.target !== event.currentTarget || !questionExiting) return
+                setQuestionExiting(false)
+                commitNextQuestion()
+              }}
+            >
               <section className="reading-column" aria-label="英文题目">
-                <div className="question-meta">
-                  <span>{progress.cursor + 1} / {sessionQuestionCount}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{question.level}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{question.tag}</span>
-                </div>
-
                 <p className="english-text" lang="en">{question.english}</p>
               </section>
 
-              <aside className="vocabulary-panel" aria-labelledby="vocabulary-heading">
-                <div className="vocabulary-toolbar">
-                  <div>
-                    <p className="eyebrow">阅读辅助</p>
-                    <h2 id="vocabulary-heading">生词提示</h2>
-                    <span>{visibleVocabulary.length} / {vocabulary.length}</span>
-                  </div>
-
-                  <div className="vocabulary-actions">
-                    <button
-                      type="button"
-                      onClick={revealNextVocabulary}
-                      disabled={allVocabularyRevealed}
-                    >
-                      提示一个
-                    </button>
-                    <button
-                      type="button"
-                      onClick={revealAllVocabulary}
-                      disabled={allVocabularyRevealed}
-                    >
-                      全部提示
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  className="vocabulary-reveal"
-                  data-open={visibleVocabulary.length > 0}
-                  aria-live="polite"
+              <aside
+                className={`vocabulary-panel ${vocabularyPanelOpen ? 'vocabulary-panel-open' : ''}`}
+                aria-label="生词提示"
+              >
+                <button
+                  className="vocabulary-tab"
+                  type="button"
+                  aria-expanded={vocabularyPanelOpen}
+                  aria-controls="vocabulary-drawer"
+                  aria-label={`${vocabularyPanelOpen ? '收起' : '打开'}生词提示，已显示 ${visibleVocabulary.length} 个，共 ${vocabulary.length} 个`}
+                  onClick={() => setVocabularyPanelOpen((open) => !open)}
                 >
-                  <div className="vocabulary-reveal-inner">
-                    <ol className="vocabulary-list">
-                      {visibleVocabulary.map((item) => (
-                        <li key={item.term}>
-                          <p className="vocabulary-term-line">
-                            <strong lang="en">{item.term}</strong>
-                            <span>{item.meaning}</span>
-                          </p>
-                          <p className="vocabulary-breakdown">{item.breakdown}</p>
-                          <VocabularyLookup term={item.term} />
-                        </li>
-                      ))}
-                    </ol>
+                  <span>词</span>
+                  <span className="vocabulary-count" key={visibleVocabulary.length}>
+                    {visibleVocabulary.length}/{vocabulary.length}
+                  </span>
+                  <span aria-hidden="true">{vocabularyPanelOpen ? '→' : '←'}</span>
+                </button>
+
+                {vocabularyPanelOpen && (
+                  <div className="vocabulary-drawer" id="vocabulary-drawer">
+                    <div className="vocabulary-actions">
+                      <button
+                        type="button"
+                        onClick={revealNextVocabulary}
+                        disabled={allVocabularyRevealed}
+                      >
+                        提示一个
+                      </button>
+                      <button
+                        type="button"
+                        onClick={revealAllVocabulary}
+                        disabled={allVocabularyRevealed}
+                      >
+                        全部提示
+                      </button>
+                    </div>
+
+                    <div
+                      className="vocabulary-reveal"
+                      data-open={visibleVocabulary.length > 0}
+                      aria-live="polite"
+                    >
+                      <div className="vocabulary-reveal-inner">
+                        <ol className="vocabulary-list">
+                          {visibleVocabulary.map((item, index) => (
+                            <li
+                              key={item.term}
+                              style={{
+                                animationDelay: vocabularyRevealBatch.stagger && index >= vocabularyRevealBatch.start
+                                  ? `${(index - vocabularyRevealBatch.start) * 50}ms`
+                                  : '0ms',
+                              }}
+                            >
+                              <p className="vocabulary-term-line">
+                                <strong lang="en">{item.term}</strong>
+                                <span>{item.meaning}</span>
+                              </p>
+                              <p className="vocabulary-breakdown">{item.breakdown}</p>
+                              <VocabularyLookup term={item.term} />
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </aside>
 
               <section className="answer-column">
-                <h2 id="question-prompt">选择最准确的理解</h2>
-
                 <div className="options" aria-label="中文选项">
                   {question.options.map((option, index) => (
                     <button
-                      className={`option option-${optionStates[index]}`}
+                      className={[
+                        'option',
+                        `option-${optionStates[index]}`,
+                        progress.selectedIndex === index ? 'option-selected' : '',
+                        hasAnswered && !isCorrect && index === question.answer ? 'option-delayed-correct' : '',
+                      ].filter(Boolean).join(' ')}
                       type="button"
                       key={`${question.id}-${index}`}
                       onClick={() => chooseOption(index)}
@@ -340,7 +442,7 @@ function App() {
 
                 <div className={`feedback ${hasAnswered ? 'feedback-visible' : ''}`} aria-live="polite">
                   {hasAnswered && (
-                    <>
+                    <div className="feedback-inner">
                       <div className="feedback-heading">
                         <span className={`result-mark ${isCorrect ? 'result-correct' : 'result-wrong'}`} aria-hidden="true">
                           {isCorrect ? '✓' : '×'}
@@ -352,28 +454,30 @@ function App() {
                       </div>
 
                       <p className="explanation" lang="zh-CN">{question.explanation}</p>
-                      <button className="next-button" type="button" onClick={nextQuestion}>
+                      <button className="next-button" type="button" onClick={nextQuestion} disabled={questionExiting}>
                         下一题 <span aria-hidden="true">→</span>
                       </button>
-                    </>
+                    </div>
                   )}
                 </div>
               </section>
             </div>
           </article>
-
-          <p className="keyboard-hint">
-            {activeKeys.join(' · ')} 作答，Enter 下一题
-          </p>
         </main>
 
         {libraryOpen && (
           <div
-            className="library-overlay"
+            className={`library-overlay ${libraryClosing ? 'library-closing' : ''}`}
+            onAnimationEnd={(event) => {
+              if (
+                event.target !== event.currentTarget
+                || !libraryClosing
+              ) return
+              finishLibraryClose(pendingTrainingLevel)
+            }}
             onClick={(event) => {
               if (event.target !== event.currentTarget) return
-              setLibraryOpen(false)
-              libraryTriggerRef.current?.focus()
+              closeLibrary()
             }}
           >
             <section
@@ -391,10 +495,7 @@ function App() {
                   type="button"
                   aria-label="关闭词库选择"
                   autoFocus
-                  onClick={() => {
-                    setLibraryOpen(false)
-                    libraryTriggerRef.current?.focus()
-                  }}
+                  onClick={closeLibrary}
                 >
                   <span aria-hidden="true">×</span>
                 </button>
@@ -403,7 +504,8 @@ function App() {
               <div className="book-shelf" role="radiogroup" aria-label="选择训练词库">
                 {trainingLevels.map((level) => {
                   const count = levelCounts[level]
-                  const isActive = activeTrainingLevel === level
+                  const isActive = (pendingTrainingLevel ?? activeTrainingLevel) === level
+                  const isConfirming = pendingTrainingLevel === level
                   const detail = levelBookDetails[level]
 
                   return (
@@ -412,9 +514,21 @@ function App() {
                       role="radio"
                       aria-checked={isActive}
                       aria-label={`${level}词库，${count}题`}
-                      className={`book-button book-${level} ${isActive ? 'book-active' : ''}`}
+                      className={[
+                        'book-button',
+                        `book-${level}`,
+                        isActive ? 'book-active' : '',
+                        isConfirming ? 'book-confirming' : '',
+                      ].filter(Boolean).join(' ')}
                       disabled={count === 0}
                       onClick={() => selectTrainingLevel(level)}
+                      onAnimationEnd={(event) => {
+                        if (
+                          event.target !== event.currentTarget
+                          || pendingTrainingLevel !== level
+                        ) return
+                        setLibraryClosing(true)
+                      }}
                       key={level}
                     >
                       <span className="book-spine" aria-hidden="true" />
@@ -428,24 +542,20 @@ function App() {
                   )
                 })}
               </div>
+
+              <div className="library-dialog-footer">
+                <p>
+                  <span className={`bank-status bank-status-${questionBankSource}`}>
+                    {questionBankLabels[questionBankSource]}
+                  </span>
+                  <span>已答 {progress.answered}</span>
+                  <span>正确率 {accuracy}%</span>
+                </p>
+                <button type="button" onClick={resetProgress}>重新开始</button>
+              </div>
             </section>
           </div>
         )}
-
-        <footer>
-          <span>已答 {progress.answered}</span>
-          <span aria-hidden="true">·</span>
-          <span>正确率 {accuracy}%</span>
-          <span aria-hidden="true">·</span>
-          <span
-            className={`bank-status bank-status-${questionBankSource}`}
-            aria-live="polite"
-          >
-            {questionBankLabels[questionBankSource]}
-          </span>
-          <span aria-hidden="true">·</span>
-          <button type="button" onClick={resetProgress}>重新开始</button>
-        </footer>
       </div>
     </>
   )
