@@ -2,6 +2,8 @@
 
 一个极简的考研英语理解训练网站。页面随机展示一句或一小段英文，用户从四个中文选项中选择最准确的理解，并立即查看解析。
 
+在线地址：<https://ally1212.github.io/kaoyan-english/>
+
 ## 功能
 
 - 40 道原创或改写的考研风格理解题
@@ -32,6 +34,10 @@ npm test
 npm run lint
 npm run build
 ```
+
+## 部署
+
+推送到 `main` 分支后，GitHub Actions 会自动执行测试、生产构建，并将 `dist` 发布到 GitHub Pages。
 
 ## 数据说明
 
