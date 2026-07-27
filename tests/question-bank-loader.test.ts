@@ -101,6 +101,6 @@ describe('online question bank', () => {
     })
 
     expect(result.source).toBe('local')
-    expect(result.questionIds).toHaveLength(40)
+    expect(result.questionIds).toHaveLength(80)
   })
 })

@@ -3,9 +3,10 @@ import { questions } from '../src/data/questions'
 import { vocabularyByQuestionId } from '../src/data/vocabulary'
 
 describe('question bank', () => {
-  it('contains 40 complete, uniquely identified questions', () => {
-    expect(questions).toHaveLength(40)
-    expect(new Set(questions.map((question) => question.id)).size).toBe(40)
+  it('contains 80 complete, uniquely identified questions', () => {
+    expect(questions).toHaveLength(80)
+    expect(new Set(questions.map((question) => question.id)).size).toBe(80)
+    expect(new Set(questions.map((question) => question.english)).size).toBe(80)
 
     for (const question of questions) {
       expect(question.english.trim().length).toBeGreaterThan(20)
@@ -19,6 +20,7 @@ describe('question bank', () => {
 
   it('provides at least two complete vocabulary hints for every question', () => {
     expect(Object.keys(vocabularyByQuestionId).sort()).toEqual(questions.map((question) => question.id).sort())
+    expect(Object.values(vocabularyByQuestionId).flat()).toHaveLength(160)
 
     for (const question of questions) {
       const vocabulary = vocabularyByQuestionId[question.id]

@@ -9,10 +9,10 @@ import {
 
 describe('training level', () => {
   it('filters the bundled bank into three difficulty pools', () => {
-    expect(getQuestionIdsForLevel(questions, '全部')).toHaveLength(40)
-    expect(getQuestionIdsForLevel(questions, '基础')).toHaveLength(13)
-    expect(getQuestionIdsForLevel(questions, '进阶')).toHaveLength(19)
-    expect(getQuestionIdsForLevel(questions, '挑战')).toHaveLength(8)
+    expect(getQuestionIdsForLevel(questions, '全部')).toHaveLength(80)
+    expect(getQuestionIdsForLevel(questions, '基础')).toHaveLength(26)
+    expect(getQuestionIdsForLevel(questions, '进阶')).toHaveLength(38)
+    expect(getQuestionIdsForLevel(questions, '挑战')).toHaveLength(16)
   })
 
   it('persists only a valid level selection', () => {

@@ -165,4 +165,164 @@ export const vocabularyByQuestionId: Record<string, VocabularyItem[]> = {
     { term: 'adaptation', meaning: '适应措施', breakdown: '气候语境中指为应对已经发生或将要发生的影响而调整。' },
     { term: 'provided that', meaning: '前提是，只要', breakdown: '引出条件，本句表示借鉴经验必须认真考虑背景差异。' },
   ],
+  s21: [
+    { term: 'not every', meaning: '并非每一个', breakdown: '表示部分否定，只是否认所有情况都成立，不是完全否定。' },
+    { term: 'resource use', meaning: '资源使用', breakdown: '指能源、材料、土地或其他投入的实际消耗量。' },
+  ],
+  s22: [
+    { term: 'not so much A as B', meaning: '与其说 A，不如说 B', breakdown: '用于转移重点，说明真正需要关注的是后面的 B。' },
+    { term: 'bear the cost', meaning: '承担成本', breakdown: 'bear 在这里不是“熊”，而是承担费用或不利后果。' },
+  ],
+  s23: [
+    { term: 'hardly enough', meaning: '很难说足够', breakdown: 'hardly 表示几乎不，强调现有证据或数量仍然不足。' },
+    { term: 'settle a question', meaning: '解决一个问题', breakdown: 'settle 在研究语境中指形成较确定、可接受的结论。' },
+  ],
+  s24: [
+    { term: 'institution', meaning: '机构，制度性组织', breakdown: '通常指学校、政府、公司等持续运作的正式组织。' },
+    { term: 'merely because', meaning: '仅仅因为', breakdown: 'merely 限定原因，表示只有这一因素通常还不充分。' },
+  ],
+  s25: [
+    { term: 'capture a feature', meaning: '捕捉、呈现一个特征', breakdown: 'capture 在模型语境中指成功表示现实中的某个方面。' },
+    { term: 'real world', meaning: '现实世界', breakdown: '与模型、理论或实验条件相对，包含更多复杂因素。' },
+  ],
+  s26: [
+    { term: 'be familiar with', meaning: '对……熟悉', breakdown: '表示经常接触或已经认识某个说法、对象或概念。' },
+    { term: 'reliable', meaning: '可靠的，可信的', breakdown: '强调信息能够被证据支持，而不是仅仅听起来熟悉。' },
+  ],
+  s27: [
+    { term: 'additional resources', meaning: '新增资源', breakdown: 'additional 表示额外增加的资金、人员或其他投入。' },
+    { term: 'effectively', meaning: '有效地', breakdown: '强调资源使用真正帮助实现目标，而不是只有投入数量增加。' },
+  ],
+  s28: [
+    { term: 'main claim', meaning: '主要观点', breakdown: '指作者希望读者接受、并由其他细节支持的核心判断。' },
+    { term: 'supporting detail', meaning: '支持性细节', breakdown: '用于解释、证明或具体说明文章主要观点的信息。' },
+  ],
+  s29: [
+    { term: 'communicate a risk', meaning: '说明风险', breakdown: '指及时、清楚地向相关人群传达可能的不利后果。' },
+    { term: 'severe', meaning: '严重的，强烈的', breakdown: '在本句中描述公众反应的程度，而不是风险是否存在。' },
+  ],
+  s30: [
+    { term: 'indicator', meaning: '指标', breakdown: '用于衡量表现、状态或变化的具体数字或变量。' },
+    { term: 'for convenience', meaning: '为了方便', breakdown: '表示选择依据是操作简单，而不一定是最准确或最合理。' },
+  ],
+  s31: [
+    { term: 'produce a clearer picture', meaning: '形成更清晰的认识', breakdown: 'picture 在这里指对整体情况的理解，而不是一张图片。' },
+    { term: 'what is happening', meaning: '正在发生的情况', breakdown: '指数据背后真实的过程、变化及其可能原因。' },
+  ],
+  s32: [
+    { term: 'what matters', meaning: '真正重要的是', breakdown: 'what 引导主语从句，用来突出核心判断标准。' },
+    { term: 'change the conclusion', meaning: '改变结论', breakdown: '表示新证据足以让原有判断发生实质调整。' },
+  ],
+  s33: [
+    { term: 'independent check', meaning: '独立检查', breakdown: '由不同人员或方法重新核对，避免同一错误持续存在。' },
+    { term: 'remain undetected', meaning: '一直未被发现', breakdown: 'remain 表示持续处于某种状态，undetected 表示没有被察觉。' },
+  ],
+  s34: [
+    { term: 'meaningful comparison', meaning: '有意义的比较', breakdown: '指比较结果能够真实反映对象差异，而不是方法差异。' },
+    { term: 'be measured', meaning: '被衡量', breakdown: '指按照某种统一方法收集并计算相关指标。' },
+  ],
+  s35: [
+    { term: 'underestimate', meaning: '低估', breakdown: 'under- 表示不足，指判断的影响或规模比实际更小。' },
+    { term: 'gradual change', meaning: '渐进变化', breakdown: '指每一步幅度较小、但长期累积后可能明显的变化。' },
+  ],
+  s36: [
+    { term: 'precise', meaning: '精密的，稳定细致的', breakdown: '强调重复测量接近或数值细致，不必然代表接近真实值。' },
+    { term: 'accurate reflection', meaning: '准确反映', breakdown: '表示指标或测量结果真正对应了现实中的目标现象。' },
+  ],
+  s37: [
+    { term: 'widespread agreement', meaning: '广泛共识', breakdown: 'widespread 表示覆盖很多人或地区，agreement 表示意见一致。' },
+    { term: 'achieve a goal', meaning: '实现目标', breakdown: 'achieve 强调经过行动最终达到预期结果。' },
+  ],
+  s38: [
+    { term: 'amount of criticism', meaning: '批评的数量', breakdown: 'amount 强调多少，与后面的 quality“质量”形成对照。' },
+    { term: 'determine whether', meaning: '决定是否', breakdown: '表示某个因素会影响后面的结果能不能成立。' },
+  ],
+  s39: [
+    { term: 'statistic', meaning: '统计数字', breakdown: '指通过数据汇总或计算得到的数值结果。' },
+    { term: 'independently of', meaning: '独立于，脱离', breakdown: '本句是否定形式，表示不能脱离数据收集背景来理解。' },
+  ],
+  s40: [
+    { term: 'valuable', meaning: '有价值的', breakdown: '表示简单解释能够帮助理解，但价值仍然受到准确性的约束。' },
+    { term: 'hide a difference', meaning: '掩盖差异', breakdown: '指简化过程中忽略了可能影响判断的重要不同之处。' },
+  ],
+  p21: [
+    { term: 'attract attention', meaning: '吸引关注', breakdown: '表示结果因为新奇或意外而受到更多人注意。' },
+    { term: 'reproduce a finding', meaning: '重复验证研究发现', breakdown: '指其他研究者在相似条件下得到相近结果。' },
+  ],
+  p22: [
+    { term: 'waking hours', meaning: '清醒时间', breakdown: '指没有睡眠、可以活动的时间，并不等于高效工作时间。' },
+    { term: 'fatigue', meaning: '疲劳', breakdown: '长期缺乏休息产生的身体和注意力下降状态。' },
+  ],
+  p23: [
+    { term: 'reduce heat', meaning: '降低热量或高温影响', breakdown: '城市绿地可通过遮阴和蒸发等方式缓解高温。' },
+    { term: 'reach safely', meaning: '安全到达', breakdown: '强调居民前往公园的道路、距离和安全条件。' },
+  ],
+  p24: [
+    { term: 'performance measure', meaning: '绩效指标', breakdown: '用于判断工作效果的数字或评价标准。' },
+    { term: 'underlying activity', meaning: '底层实际活动', breakdown: '指指标原本希望反映的真实工作或行为。' },
+  ],
+  p25: [
+    { term: 'past decision', meaning: '过去的决定', breakdown: '指历史人物在当时条件下作出的选择。' },
+    { term: 'present knowledge', meaning: '当前知识', breakdown: '指今天已经知道、但过去的人未必能够获得的信息。' },
+  ],
+  p26: [
+    { term: 'food label', meaning: '食品标签', breakdown: '包装上说明成分、营养、日期等信息的文字区域。' },
+    { term: 'usefulness declines', meaning: '实用性下降', breakdown: '表示信息虽然存在，但难找难懂会削弱它的实际帮助。' },
+  ],
+  p27: [
+    { term: 'study space', meaning: '学习空间', breakdown: '指能够安静、稳定完成课程和作业的环境。' },
+    { term: 'support at home', meaning: '家庭支持', breakdown: '包括设备、时间安排、指导和情绪支持等条件。' },
+  ],
+  p28: [
+    { term: 'news organization', meaning: '新闻机构', breakdown: '指负责采访、编辑和发布新闻的媒体组织。' },
+    { term: 'openly fix errors', meaning: '公开纠正错误', breakdown: '不仅修改内容，也向读者承认并说明此前的问题。' },
+  ],
+  p29: [
+    { term: 'deserve credit', meaning: '值得被认为有功', breakdown: '表示某项政策可能对结果产生了积极贡献。' },
+    { term: 'claim cause', meaning: '声称存在因果关系', breakdown: '表示进一步断言政策而非其他因素造成了变化。' },
+  ],
+  p30: [
+    { term: 'repeated daily', meaning: '每天重复', breakdown: '表示小行动通过稳定重复形成长期累积效果。' },
+    { term: 'meaningful benefit', meaning: '明显而有意义的收益', breakdown: '指虽然单次变化小，长期仍能产生实际帮助。' },
+  ],
+  p31: [
+    { term: 'conservation project', meaning: '自然保护项目', breakdown: '旨在保护生态、物种或自然资源的长期行动。' },
+    { term: 'shape the rules', meaning: '参与制定规则', breakdown: 'shape 表示影响规则的内容，而不是只被动接受。' },
+  ],
+  p32: [
+    { term: 'apply the same rule', meaning: '应用同一规则', breakdown: '表示处理表面一致，但输入数据可能包含不同历史背景。' },
+    { term: 'earlier inequality', meaning: '过去的不平等', breakdown: '指历史上已经存在并可能进入数据的资源或机会差异。' },
+  ],
+  p33: [
+    { term: 'perfect evidence', meaning: '完全充分的证据', breakdown: '指几乎没有不确定性的理想证据，现实中往往难以及时获得。' },
+    { term: 'avoidable harm', meaning: '可以避免的伤害', breakdown: '指如果判断更谨慎，本来有机会减少或阻止的不利后果。' },
+  ],
+  p34: [
+    { term: 'breakthrough', meaning: '重大突破', breakdown: '指研究、技术或认识上产生的重要进展。' },
+    { term: 'shared tool', meaning: '共享工具', breakdown: '由许多人共同使用并支持进一步发现的方法或设施。' },
+  ],
+  p35: [
+    { term: 'digital library', meaning: '数字图书馆', breakdown: '通过网络提供电子书、检索和远程访问的资源系统。' },
+    { term: 'community activity', meaning: '社区活动', breakdown: '由当地居民共同参与的讲座、学习或公共文化活动。' },
+  ],
+  p36: [
+    { term: 'average price increase', meaning: '平均价格涨幅', breakdown: '把多种商品价格变化汇总成一个整体数字。' },
+    { term: 'share of income', meaning: '收入占比', breakdown: '表示某类支出占家庭全部收入的比例。' },
+  ],
+  p37: [
+    { term: 'recognize a word', meaning: '认出一个单词', breakdown: '看到或听到时能够理解，但不一定能主动准确使用。' },
+    { term: 'active use', meaning: '主动运用', breakdown: '指在表达中自己选择并正确使用词语。' },
+  ],
+  p38: [
+    { term: 'bear the risk', meaning: '承担风险', breakdown: '指某个群体面对技术可能造成的不利结果。' },
+    { term: 'get to decide', meaning: '拥有决定权', breakdown: '强调谁有权选择技术如何设计、部署和使用。' },
+  ],
+  p39: [
+    { term: 'guarantee', meaning: '保证', breakdown: 'does not guarantee 表示某个条件不足以确保结果出现。' },
+    { term: 'reorganize ideas', meaning: '重新组织观点', breakdown: '把信息按照自己的理解重新分类、概括和连接。' },
+  ],
+  p40: [
+    { term: 'diverse team', meaning: '多样化团队', breakdown: '成员在经历、知识或观点上存在差异的团队。' },
+    { term: 'take a view seriously', meaning: '认真对待一种观点', breakdown: '表示真正考虑不同意见，而不是只允许其被说出来。' },
+  ],
 }

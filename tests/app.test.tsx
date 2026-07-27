@@ -112,9 +112,9 @@ describe('quiz flow', () => {
   it('opens the book chooser on demand, switches level, and closes it', async () => {
     render(<App />)
 
-    expect(screen.queryByRole('radio', { name: '挑战词库，8题' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    const challengeBook = screen.getByRole('radio', { name: '挑战词库，8题' })
+    const challengeBook = screen.getByRole('radio', { name: '挑战词库，16题' })
     fireEvent.click(challengeBook)
     finishAnimation(challengeBook)
     finishAnimation(document.querySelector('.library-overlay')!)
@@ -126,13 +126,13 @@ describe('quiz flow', () => {
         correct: number
       }
 
-      expect(saved.order).toHaveLength(8)
+      expect(saved.order).toHaveLength(16)
       expect(saved.order.every((id) => questionById.get(id)?.level === '挑战')).toBe(true)
       expect(saved.answered).toBe(0)
       expect(saved.correct).toBe(0)
       expect(window.localStorage.getItem(TRAINING_LEVEL_STORAGE_KEY)).toBe('挑战')
       expect(screen.getByText('1 / 5')).toBeInTheDocument()
-      expect(screen.queryByRole('radio', { name: '挑战词库，8题' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: /当前词库：挑战册/ })).toBeInTheDocument()
     })
   })
@@ -141,13 +141,13 @@ describe('quiz flow', () => {
     render(<App />)
 
     fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    const challengeBook = screen.getByRole('radio', { name: '挑战词库，8题' })
+    const challengeBook = screen.getByRole('radio', { name: '挑战词库，16题' })
     fireEvent.click(challengeBook)
     fireEvent.click(screen.getByRole('button', { name: '关闭词库选择' }))
     finishAnimation(challengeBook)
     finishAnimation(document.querySelector('.library-overlay')!)
 
-    expect(screen.queryByRole('radio', { name: '挑战词库，8题' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /当前词库：混合卷/ })).toBeInTheDocument()
     expect(window.localStorage.getItem(TRAINING_LEVEL_STORAGE_KEY)).toBe('全部')
   })
@@ -227,8 +227,8 @@ describe('quiz flow', () => {
     expect(screen.queryByText(firstQuestion.english)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    fireEvent.click(screen.getByRole('radio', { name: '挑战词库，8题' }))
-    expect(screen.queryByRole('radio', { name: '挑战词库，8题' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: '挑战词库，16题' }))
+    expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /当前词库：挑战册/ })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /打开生词提示/ }))
@@ -297,7 +297,7 @@ describe('quiz flow', () => {
 
     render(<App />)
     fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    const challengeBook = screen.getByRole('radio', { name: '挑战词库，8题' })
+    const challengeBook = screen.getByRole('radio', { name: '挑战词库，16题' })
     fireEvent.click(challengeBook)
 
     resolveFetch({ ok: true, json: async () => onlineQuestionBank })
