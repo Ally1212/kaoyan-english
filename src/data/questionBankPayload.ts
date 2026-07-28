@@ -7,6 +7,12 @@ export interface SerializedQuestion extends Question {
 
 export interface QuestionBankPayload {
   version: 1
+  source?: {
+    name: string
+    url: string
+    license: string
+    snapshot?: string
+  }
   updatedAt?: string
   questions: SerializedQuestion[]
 }

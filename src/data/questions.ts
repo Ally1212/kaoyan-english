@@ -1,5 +1,15 @@
 export type QuestionKind = '句子' | '短段落'
 export type QuestionLevel = '基础' | '进阶' | '挑战'
+export type QuestionExam = 'cet4' | 'cet6' | 'ky' | 'ielts' | 'toefl'
+
+export interface QuestionSource {
+  name: string
+  url: string
+  license: string
+  licenseUrl: string
+  attribution: string
+  adaptation: string
+}
 
 export interface Question {
   id: string
@@ -10,6 +20,9 @@ export interface Question {
   options: [string, string, string, string]
   answer: 0 | 1 | 2 | 3
   explanation: string
+  qualityScore?: number
+  exams?: QuestionExam[]
+  source?: QuestionSource
 }
 
 export const questions: Question[] = [

@@ -1,16 +1,20 @@
-import { createProgress, normalizeProgress, type QuizProgress } from './quiz'
+import { normalizeProgress, type QuizProgress } from './quiz'
 
 export const STORAGE_KEY = 'kaoyan-english-progress-v1'
 
-export function loadProgress(ids: string[]): QuizProgress {
-  if (typeof window === 'undefined') return createProgress(ids)
+export function readProgress(): unknown {
+  if (typeof window === 'undefined') return null
 
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY)
-    return normalizeProgress(saved ? JSON.parse(saved) : null, ids)
+    return saved ? JSON.parse(saved) : null
   } catch {
-    return createProgress(ids)
+    return null
   }
+}
+
+export function loadProgress(ids: string[]): QuizProgress {
+  return normalizeProgress(readProgress(), ids)
 }
 
 export function saveProgress(progress: QuizProgress): void {

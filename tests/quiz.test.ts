@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { advanceProgress, createOrder, createProgress, normalizeProgress, shuffleIds } from '../src/lib/quiz'
+import { questions } from '../src/data/questions'
+import {
+  advanceProgress,
+  createOrder,
+  createProgress,
+  createReadingQuestion,
+  normalizeProgress,
+  shuffleIds,
+} from '../src/lib/quiz'
 
 const ids = ['q1', 'q2', 'q3', 'q4']
 
@@ -15,6 +23,17 @@ describe('quiz order', () => {
     const result = createOrder(ids, 'q1', () => 0)
 
     expect(result[0]).not.toBe('q1')
+  })
+
+  it('places higher-weight training items earlier when random values are equal', () => {
+    const result = createOrder(
+      ['low-quality', 'featured'],
+      undefined,
+      () => 0.5,
+      (id) => id === 'featured' ? 10 : 1,
+    )
+
+    expect(result).toEqual(['featured', 'low-quality'])
   })
 
   it('starts a new shuffled round after the final question', () => {
@@ -65,5 +84,17 @@ describe('saved progress', () => {
     expect(result.cursor).toBe(ids.length - 1)
     expect(result.correct).toBe(3)
     expect(result.selectedIndex).toBeNull()
+  })
+})
+
+describe('reading review questions', () => {
+  it('moves the correct option during review without changing its meaning', () => {
+    const practice = createReadingQuestion(questions[0], 'practice')
+    const review = createReadingQuestion(questions[0], 'review')
+
+    expect(practice).toBe(questions[0])
+    expect(review.answer).toBe((practice.answer + 1) % 4)
+    expect(review.options[review.answer]).toBe(practice.options[practice.answer])
+    expect(new Set(review.options)).toEqual(new Set(practice.options))
   })
 })

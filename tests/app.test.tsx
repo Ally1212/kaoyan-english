@@ -1,46 +1,45 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../src/App'
+import { bundledVocabularyWords } from '../src/data/vocabularyFallback'
 import { questionById, questionIds } from '../src/data/questions'
+import { MISTAKE_STORAGE_KEY } from '../src/lib/mistakes'
+import { QUESTION_FEEDBACK_STORAGE_KEY } from '../src/lib/questionFeedback'
 import { STORAGE_KEY } from '../src/lib/storage'
-import { TRAINING_LEVEL_STORAGE_KEY } from '../src/lib/trainingLevel'
+import { TRAINING_PREFERENCES_STORAGE_KEY } from '../src/lib/trainingPreferences'
+import { createLocalVocabularyBank, getWordsForExam } from '../src/lib/vocabularyBank'
+import { createVocabularyQuestion } from '../src/lib/vocabularyQuiz'
 
-const finishAnimation = (element: Element) => {
-  fireEvent(element, new Event('animationend', { bubbles: true }))
-  fireEvent(element, new Event('webkitAnimationEnd', { bubbles: true }))
+const fallbackBank = createLocalVocabularyBank()
+const fallbackKaoyanWords = getWordsForExam(fallbackBank.words, 'ky')
+const fallbackKaoyanIds = fallbackKaoyanWords.map((word) => word.id)
+const fallbackCet4Count = getWordsForExam(fallbackBank.words, 'cet4').length
+
+function setProgress(order: string[]) {
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    version: 1,
+    order,
+    cursor: 0,
+    answered: 0,
+    correct: 0,
+    selectedIndex: null,
+  }))
 }
 
-const onlineQuestionBank = {
-  version: 1,
-  questions: [
-    {
-      id: 'online-1',
-      kind: '句子',
-      level: '基础',
-      tag: '联网',
-      english: 'Online questions can update without rebuilding the website.',
-      options: ['在线题库无法更新。', '在线题库可以独立更新。', '网站必须停止工作。', '浏览器不能读取 JSON。'],
-      answer: 1,
-      explanation: '题库通过 JSON 获取，因此题目内容可以独立于网站界面更新。',
-      vocabulary: [
-        { term: 'rebuild', meaning: '重新构建', breakdown: '指重新执行网站的生产构建流程。' },
-      ],
-    },
-  ],
+function setWordTraining() {
+  window.localStorage.setItem(TRAINING_PREFERENCES_STORAGE_KEY, JSON.stringify({
+    exam: 'ky',
+    mode: 'word-zh',
+    level: '全部',
+  }))
+  setProgress(fallbackKaoyanIds)
 }
 
-describe('quiz flow', () => {
+describe('training flow', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
     window.localStorage.clear()
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      version: 1,
-      order: questionIds,
-      cursor: 0,
-      answered: 0,
-      correct: 0,
-      selectedIndex: null,
-    }))
+    setProgress(questionIds)
   })
 
   afterEach(() => {
@@ -48,287 +47,347 @@ describe('quiz flow', () => {
     vi.unstubAllGlobals()
   })
 
-  it('judges an answer, updates stats, and advances to a different question', async () => {
+  it('keeps the existing reading flow and WASD shortcuts', () => {
     render(<App />)
 
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}') as {
-      order: string[]
-      cursor: number
-    }
-    const firstQuestion = questionById.get(saved.order[saved.cursor])!
-
-    fireEvent.click(screen.getByRole('button', { name: firstQuestion.options[firstQuestion.answer] }))
+    const firstQuestion = questionById.get(questionIds[0])!
+    fireEvent.keyDown(window, { key: ['w', 'a', 's', 'd'][firstQuestion.answer] })
 
     expect(screen.getByText('理解正确')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    expect(screen.getByText('正确率 100%')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '关闭词库选择' }))
-    finishAnimation(document.querySelector('.library-overlay')!)
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: '关闭词库选择' })).not.toBeInTheDocument()
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: /下一题/ }))
-    finishAnimation(document.querySelector('.question-content')!)
-
-    await waitFor(() => {
-      expect(screen.queryByText(firstQuestion.english)).not.toBeInTheDocument()
-      expect(screen.queryByText('理解正确')).not.toBeInTheDocument()
-    })
-  })
-
-  it('keeps WASD on the options and maps A to the second option', () => {
-    render(<App />)
-
-    const secondOption = questionById.get(questionIds[0])!.options[1]
-    fireEvent.keyDown(window, { key: 'a' })
-
-    expect(screen.queryByText('WASD')).not.toBeInTheDocument()
-    expect(screen.queryByText('ABCD')).not.toBeInTheDocument()
     expect(screen.getByLabelText('快捷键 W')).toBeInTheDocument()
     expect(screen.getByLabelText('快捷键 A')).toBeInTheDocument()
     expect(screen.getByLabelText('快捷键 S')).toBeInTheDocument()
     expect(screen.getByLabelText('快捷键 D')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: secondOption })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('理解正确')).toBeInTheDocument()
-  })
-
-  it('applies the answer feedback motion classes in the intended sequence', () => {
-    render(<App />)
-
-    const firstQuestion = questionById.get(questionIds[0])!
-    const wrongIndex = (firstQuestion.answer + 1) % firstQuestion.options.length
-    const selectedButton = screen.getByRole('button', { name: firstQuestion.options[wrongIndex] })
-    const correctButton = screen.getByRole('button', { name: firstQuestion.options[firstQuestion.answer] })
-
-    fireEvent.click(selectedButton)
-
-    expect(selectedButton).toHaveClass('option-selected', 'option-wrong')
-    expect(correctButton).toHaveClass('option-correct', 'option-delayed-correct')
-    expect(document.querySelector('.feedback-inner')).toBeInTheDocument()
-  })
-
-  it('opens the book chooser on demand, switches level, and closes it', async () => {
-    render(<App />)
-
-    expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    const challengeBook = screen.getByRole('radio', { name: '挑战词库，16题' })
-    fireEvent.click(challengeBook)
-    finishAnimation(challengeBook)
-    finishAnimation(document.querySelector('.library-overlay')!)
-
-    await waitFor(() => {
-      const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}') as {
-        order: string[]
-        answered: number
-        correct: number
-      }
-
-      expect(saved.order).toHaveLength(16)
-      expect(saved.order.every((id) => questionById.get(id)?.level === '挑战')).toBe(true)
-      expect(saved.answered).toBe(0)
-      expect(saved.correct).toBe(0)
-      expect(window.localStorage.getItem(TRAINING_LEVEL_STORAGE_KEY)).toBe('挑战')
-      expect(screen.getByText('1 / 5')).toBeInTheDocument()
-      expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /当前词库：挑战册/ })).toBeInTheDocument()
-    })
-  })
-
-  it('cancels a pending level switch when the chooser is closed', () => {
-    render(<App />)
-
-    fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    const challengeBook = screen.getByRole('radio', { name: '挑战词库，16题' })
-    fireEvent.click(challengeBook)
-    fireEvent.click(screen.getByRole('button', { name: '关闭词库选择' }))
-    finishAnimation(challengeBook)
-    finishAnimation(document.querySelector('.library-overlay')!)
-
-    expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /当前词库：混合卷/ })).toBeInTheDocument()
-    expect(window.localStorage.getItem(TRAINING_LEVEL_STORAGE_KEY)).toBe('全部')
-  })
-
-  it('does not advance again when progress is reset during a question exit', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-    render(<App />)
-
-    const firstQuestion = questionById.get(questionIds[0])!
-    fireEvent.click(screen.getByRole('button', { name: firstQuestion.options[firstQuestion.answer] }))
-    fireEvent.click(screen.getByRole('button', { name: /下一题/ }))
-    fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    fireEvent.click(screen.getByRole('button', { name: '重新开始' }))
-
-    expect(screen.getByRole('article', { name: '英文理解选择题' })).toHaveAttribute('aria-busy', 'false')
-    finishAnimation(document.querySelector('.question-content')!)
-    expect(screen.getByText('1 / 5')).toBeInTheDocument()
-
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}') as {
-      cursor: number
-      answered: number
-    }
-    expect(saved.cursor).toBe(0)
-    expect(saved.answered).toBe(0)
-  })
-
-  it('reveals one vocabulary item and then all remaining items', () => {
-    render(<App />)
-
-    expect(screen.queryByText('阅读辅助')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '提示一个' })).not.toBeInTheDocument()
-    expect(screen.queryByText('be attributed to')).not.toBeInTheDocument()
-    expect(screen.queryByText('solely')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /打开生词提示/ }))
-    fireEvent.click(screen.getByRole('button', { name: '提示一个' }))
-
-    expect(screen.getByText('be attributed to')).toBeInTheDocument()
-    expect(screen.queryByText('solely')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '全部提示' }))
-
-    expect(screen.getByText('solely')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '提示一个' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '全部提示' })).toBeDisabled()
-  })
-
-  it('staggers only the newly revealed vocabulary batch', () => {
-    render(<App />)
-
-    fireEvent.click(screen.getByRole('button', { name: /打开生词提示/ }))
-    fireEvent.click(screen.getByRole('button', { name: '全部提示' }))
-
-    const items = document.querySelectorAll<HTMLElement>('.vocabulary-list > li')
-    expect(items).toHaveLength(2)
-    expect(items[0].style.animationDelay).toBe('0ms')
-    expect(items[1].style.animationDelay).toBe('50ms')
-  })
-
-  it('skips transition delays when reduced motion is requested', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({
-      matches: true,
-      media: '(prefers-reduced-motion: reduce)',
-      onchange: null,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })))
-
-    render(<App />)
-
-    const firstQuestion = questionById.get(questionIds[0])!
-    fireEvent.click(screen.getByRole('button', { name: firstQuestion.options[firstQuestion.answer] }))
     fireEvent.click(screen.getByRole('button', { name: /下一题/ }))
     expect(screen.queryByText(firstQuestion.english)).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    fireEvent.click(screen.getByRole('radio', { name: '挑战词库，16题' }))
-    expect(screen.queryByRole('radio', { name: '挑战词库，16题' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /当前词库：挑战册/ })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /打开生词提示/ }))
-    fireEvent.click(screen.getByRole('button', { name: '全部提示' }))
-    document.querySelectorAll<HTMLElement>('.vocabulary-list > li').forEach((item) => {
-      expect(item.style.animationDelay).toBe('0ms')
-    })
   })
 
-  it('loads an online definition only after the user asks for it', async () => {
-    const fetcher = vi.fn((input: string) => {
-      if (input.includes('api.dictionaryapi.dev')) {
+  it('shows five examination books, training modes, and reading difficulty separately', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /选择词库和类型/ }))
+
+    expect(screen.getByRole('radio', { name: /^四级句库，/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /^六级句库，/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /^考研句库，/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /^雅思句库，/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: /^托福句库，/ })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: '句意理解' })).toBeChecked()
+    expect(screen.getByRole('radiogroup', { name: '阅读难度' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('radio', { name: /^四级句库，/ }))
+    expect(screen.getByRole('radio', { name: '句意理解' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: '句意理解' })).toBeEnabled()
+    expect(screen.getByRole('radiogroup', { name: '阅读难度' })).toBeInTheDocument()
+  })
+
+  it('uses an accessible in-page confirmation before clearing records', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /选择词库和类型/ }))
+    fireEvent.click(screen.getByRole('button', { name: '清空记录' }))
+
+    expect(screen.getByRole('alertdialog', { name: '清空训练记录？' })).toBeInTheDocument()
+    expect(screen.getByText('当前答题进度、错题和题目反馈都会被删除。')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '取消' })).toHaveFocus()
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: '清空记录' })).toHaveFocus())
+  })
+
+  it('clears saved progress only after explicit confirmation', () => {
+    window.localStorage.setItem(MISTAKE_STORAGE_KEY, JSON.stringify([{ key: 'saved-mistake' }]))
+    window.localStorage.setItem(QUESTION_FEEDBACK_STORAGE_KEY, JSON.stringify([{
+      questionId: questionIds[0],
+      reportedAt: '2026-07-28T00:00:00.000Z',
+    }]))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /选择词库和类型/ }))
+    fireEvent.click(screen.getByRole('button', { name: '清空记录' }))
+    fireEvent.click(screen.getByRole('button', { name: '确认清空' }))
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(window.localStorage.getItem(MISTAKE_STORAGE_KEY)).toBe('[]')
+    expect(window.localStorage.getItem(QUESTION_FEEDBACK_STORAGE_KEY)).toBe('[]')
+  })
+
+  it('switches to a vocabulary book and presents word meaning questions', () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /选择词库和类型/ }))
+    fireEvent.click(screen.getByRole('radio', { name: /^四级句库，/ }))
+    fireEvent.click(screen.getByRole('radio', { name: '单词认义' }))
+    fireEvent.click(screen.getByRole('button', { name: '开始训练' }))
+
+    expect(screen.getByRole('button', { name: /当前训练：四级词库 · 单词认义/ })).toBeInTheDocument()
+    expect(document.querySelector('.english-word')).toBeInTheDocument()
+    expect(screen.getByText(/1 \/ 5/)).toBeInTheDocument()
+  })
+
+  it('lets readers locally reduce and restore a questionable sentence', async () => {
+    render(<App />)
+    const question = questionById.get(questionIds[0])!
+    fireEvent.click(screen.getByRole('button', { name: question.options[question.answer] }))
+
+    const reportButton = screen.getByRole('button', { name: '题目有问题' })
+    fireEvent.click(reportButton)
+    expect(screen.getByRole('button', { name: '已减少出现 · 撤销' })).toBePressed()
+    await waitFor(() => expect(JSON.parse(
+      window.localStorage.getItem(QUESTION_FEEDBACK_STORAGE_KEY) ?? '[]',
+    )).toHaveLength(1))
+
+    fireEvent.click(screen.getByRole('button', { name: '已减少出现 · 撤销' }))
+    expect(screen.getByRole('button', { name: '题目有问题' })).not.toBePressed()
+  })
+
+  it('supplements a partial online vocabulary bank with local exam fallbacks', async () => {
+    setWordTraining()
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      if (String(input).includes('vocabulary-bank.json')) {
         return Promise.resolve({
           ok: true,
-          status: 200,
-          json: async () => [{
-            word: 'attributed',
-            phonetic: '/əˈtrɪbjuːtɪd/',
-            phonetics: [],
-            meanings: [{
-              partOfSpeech: 'verb',
-              definitions: [{ definition: 'Regarded as being caused by something.' }],
+          json: async () => ({
+            version: 1,
+            words: [{
+              word: 'webnative',
+              phonetic: '',
+              translation: '网络原生的',
+              definition: 'designed to work naturally on the web',
+              pos: 'adj',
+              tags: ['cet4'],
+              frequency: 1,
             }],
-            license: { name: 'CC BY-SA 3.0', url: 'https://creativecommons.org/licenses/by-sa/3.0' },
-            sourceUrls: ['https://en.wiktionary.org/wiki/attributed'],
-          }],
+          }),
         })
       }
-
       return new Promise(() => undefined)
-    })
-    vi.stubGlobal('fetch', fetcher)
-
-    render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: /打开生词提示/ }))
-    fireEvent.click(screen.getByRole('button', { name: '提示一个' }))
-
-    expect(screen.queryByText('Regarded as being caused by something.')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '查询 attributed 的在线词典' }))
-
-    expect(await screen.findByText('Regarded as being caused by something.')).toBeInTheDocument()
-    expect(screen.getByText(/在线词典/)).toBeInTheDocument()
-  })
-
-  it('loads a validated online question bank', async () => {
-    window.localStorage.setItem(TRAINING_LEVEL_STORAGE_KEY, '挑战')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => onlineQuestionBank,
     }))
 
     render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /选择词库和类型/ }))
 
-    expect(await screen.findByText('Online questions can update without rebuilding the website.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    expect(screen.getByText('在线题库')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: '全部词库，1题' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('radio', { name: '挑战词库，0题' })).toBeDisabled()
+    await waitFor(() => expect(screen.getByRole('radio', {
+      name: `四级词库，${fallbackCet4Count + 1}词`,
+    })).toBeInTheDocument())
+    expect(screen.getByRole('radio', { name: /^考研词库，/ })).toBeInTheDocument()
   })
 
-  it('uses the latest online bank when a pending level animation completes', async () => {
-    let resolveFetch!: (value: unknown) => void
-    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => {
-      resolveFetch = resolve
-    })))
+  it('restores an online-only saved word after the full bank finishes loading', async () => {
+    setWordTraining()
+    setProgress(['online-exclusive', ...fallbackKaoyanIds])
+    let resolveVocabulary: ((response: { ok: boolean; json: () => Promise<unknown> }) => void) | undefined
+    const vocabularyResponse = new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
+      resolveVocabulary = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => (
+      String(input).includes('vocabulary-bank.json')
+        ? vocabularyResponse
+        : new Promise(() => undefined)
+    )))
 
     render(<App />)
-    fireEvent.click(screen.getByRole('button', { name: /选择词库/ }))
-    const challengeBook = screen.getByRole('radio', { name: '挑战词库，16题' })
-    fireEvent.click(challengeBook)
+    expect(JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}').order[0]).toBe('online-exclusive')
 
-    resolveFetch({ ok: true, json: async () => onlineQuestionBank })
-    expect(await screen.findByText(onlineQuestionBank.questions[0].english)).toBeInTheDocument()
+    await act(async () => {
+      resolveVocabulary?.({
+        ok: true,
+        json: async () => ({
+          version: 1,
+          words: [{
+            word: 'online-exclusive',
+            phonetic: 'online',
+            translation: '线上专属词',
+            definition: 'available only in the complete online bank',
+            pos: 'adj',
+            tags: ['ky'],
+            frequency: 1,
+          }],
+        }),
+      })
+      await vocabularyResponse
+    })
 
-    finishAnimation(challengeBook)
-    finishAnimation(document.querySelector('.library-overlay')!)
-
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}') as { order: string[] }
-    expect(saved.order).toEqual(['online-1'])
-    expect(screen.getByRole('button', { name: /当前词库：混合卷/ })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('online-exclusive')).toBeInTheDocument())
+    await waitFor(() => expect(JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) ?? '{}',
+    ).order[0]).toBe('online-exclusive'))
   })
 
-  it('advances with the latest online bank after a question exit animation', async () => {
-    let resolveFetch!: (value: unknown) => void
-    vi.stubGlobal('fetch', vi.fn(() => new Promise((resolve) => {
-      resolveFetch = resolve
-    })))
+  it('freezes an answered question while a larger vocabulary bank arrives', async () => {
+    setWordTraining()
+    let resolveVocabulary: ((response: { ok: boolean; json: () => Promise<unknown> }) => void) | undefined
+    const vocabularyResponse = new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
+      resolveVocabulary = resolve
+    })
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => (
+      String(input).includes('vocabulary-bank.json')
+        ? vocabularyResponse
+        : new Promise(() => undefined)
+    )))
 
     render(<App />)
-    const firstQuestion = questionById.get(questionIds[0])!
-    fireEvent.click(screen.getByRole('button', { name: firstQuestion.options[firstQuestion.answer] }))
+    const optionsBefore = Array.from(document.querySelectorAll('.option')).map((option) => option.textContent)
+    const question = createVocabularyQuestion(fallbackKaoyanWords, fallbackKaoyanIds[0], 'word-zh', 'practice')
+    fireEvent.click(screen.getByRole('button', { name: question.options[(question.answer + 1) % 4] }))
+
+    await act(async () => {
+      resolveVocabulary?.({
+        ok: true,
+        json: async () => ({
+          version: 1,
+          words: Array.from({ length: 8 }, (_, index) => ({
+            word: `remote-word-${index}`,
+            phonetic: `remote-${index}`,
+            translation: `远程释义 ${index}`,
+            definition: `remote definition ${index}`,
+            pos: 'v',
+            tags: ['ky'],
+            frequency: index + 1,
+          })),
+        }),
+      })
+      await vocabularyResponse
+    })
+
+    await waitFor(() => expect(
+      Array.from(document.querySelectorAll('.option')).map((option) => option.textContent),
+    ).toEqual(optionsBefore))
+  })
+
+  it('collects mistakes after five questions and starts a focused self-test', () => {
+    setWordTraining()
+    render(<App />)
+
+    for (let index = 0; index < 5; index += 1) {
+      const wordId = fallbackKaoyanIds[index]
+      const question = createVocabularyQuestion(fallbackKaoyanWords, wordId, 'word-zh', 'practice')
+      const wrongIndex = (question.answer + 1) % 4
+      fireEvent.click(screen.getByRole('button', { name: question.options[wrongIndex] }))
+      fireEvent.click(screen.getByRole('button', { name: index === 4 ? /查看阶段自测/ : /下一题/ }))
+    }
+
+    expect(screen.getByRole('heading', { name: '阶段自测' })).toBeInTheDocument()
+    expect(screen.getByText('本轮错 5 道，立即重新测试这些内容。')).toBeInTheDocument()
+    expect(JSON.parse(window.localStorage.getItem(MISTAKE_STORAGE_KEY) ?? '[]')).toHaveLength(5)
+
+    fireEvent.click(screen.getByRole('button', { name: /开始自测/ }))
+    expect(screen.getByText('错题自测')).toBeInTheDocument()
+    expect(screen.getByText('自测 1 / 5')).toBeInTheDocument()
+  })
+
+  it('shows the answer chosen during the self-test on the result sheet', () => {
+    setWordTraining()
+    render(<App />)
+
+    const firstPracticeQuestion = createVocabularyQuestion(
+      fallbackKaoyanWords,
+      fallbackKaoyanIds[0],
+      'word-zh',
+      'practice',
+    )
+    const firstWrongAnswer = firstPracticeQuestion.options.find((_, index) => index !== firstPracticeQuestion.answer)!
+    fireEvent.click(screen.getByRole('button', { name: firstWrongAnswer }))
     fireEvent.click(screen.getByRole('button', { name: /下一题/ }))
 
-    resolveFetch({ ok: true, json: async () => onlineQuestionBank })
-    expect(await screen.findByText(onlineQuestionBank.questions[0].english)).toBeInTheDocument()
+    for (let index = 1; index < 5; index += 1) {
+      const question = createVocabularyQuestion(fallbackKaoyanWords, fallbackKaoyanIds[index], 'word-zh', 'practice')
+      fireEvent.click(screen.getByRole('button', { name: question.options[question.answer] }))
+      fireEvent.click(screen.getByRole('button', { name: index === 4 ? /查看阶段自测/ : /下一题/ }))
+    }
 
-    finishAnimation(document.querySelector('.question-content')!)
+    fireEvent.click(screen.getByRole('button', { name: /开始自测/ }))
+    const reviewQuestion = createVocabularyQuestion(fallbackKaoyanWords, fallbackKaoyanIds[0], 'word-zh', 'review')
+    const reviewWrongAnswer = reviewQuestion.options.find((option, index) => (
+      index !== reviewQuestion.answer && option !== firstWrongAnswer
+    ))!
+    fireEvent.click(screen.getByRole('button', { name: reviewWrongAnswer }))
+    fireEvent.click(screen.getByRole('button', { name: /查看自测结果/ }))
 
-    const saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? '{}') as { order: string[] }
-    expect(saved.order).toEqual(['online-1'])
-    expect(screen.getByText(onlineQuestionBank.questions[0].english)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '自测结果' })).toBeInTheDocument()
+    expect(screen.getByText((_, element) => element?.textContent === `你的选择：${reviewWrongAnswer}`)).toBeInTheDocument()
+    expect(screen.queryByText((_, element) => element?.textContent === `你的选择：${firstWrongAnswer}`)).not.toBeInTheDocument()
+  })
+
+  it('shows the next spaced-review step after a corrected self-test', () => {
+    setWordTraining()
+    render(<App />)
+
+    for (let index = 0; index < 5; index += 1) {
+      const question = createVocabularyQuestion(fallbackKaoyanWords, fallbackKaoyanIds[index], 'word-zh', 'practice')
+      const answerIndex = index === 0 ? (question.answer + 1) % 4 : question.answer
+      fireEvent.click(screen.getByRole('button', { name: question.options[answerIndex] }))
+      fireEvent.click(screen.getByRole('button', { name: index === 4 ? /查看阶段自测/ : /下一题/ }))
+    }
+
+    fireEvent.click(screen.getByRole('button', { name: /开始自测/ }))
+    const reviewQuestion = createVocabularyQuestion(fallbackKaoyanWords, fallbackKaoyanIds[0], 'word-zh', 'review')
+    fireEvent.click(screen.getByRole('button', { name: reviewQuestion.options[reviewQuestion.answer] }))
+    fireEvent.click(screen.getByRole('button', { name: /查看自测结果/ }))
+
+    expect(screen.getByText('明日复习')).toBeInTheDocument()
+  })
+
+  it('shows a clean pass card instead of inventing review questions after five correct answers', () => {
+    setWordTraining()
+    render(<App />)
+
+    for (let index = 0; index < 5; index += 1) {
+      const wordId = fallbackKaoyanIds[index]
+      const question = createVocabularyQuestion(fallbackKaoyanWords, wordId, 'word-zh', 'practice')
+      fireEvent.click(screen.getByRole('button', { name: question.options[question.answer] }))
+      fireEvent.click(screen.getByRole('button', { name: index === 4 ? /查看阶段自测/ : /下一题/ }))
+    }
+
+    expect(screen.getByText('5 / 5，本轮没有需要复习的错题。')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /开始自测/ })).not.toBeInTheDocument()
+  })
+
+  it('adds a historical unresolved mistake to the stage review after a clean round', () => {
+    setWordTraining()
+    const historicalId = fallbackKaoyanIds[6]
+    const historicalQuestion = createVocabularyQuestion(fallbackKaoyanWords, historicalId, 'word-zh', 'practice')
+    window.localStorage.setItem(MISTAKE_STORAGE_KEY, JSON.stringify([{
+      key: `word-zh:ky:${historicalId}`,
+      itemId: historicalId,
+      exam: 'ky',
+      mode: 'word-zh',
+      prompt: historicalQuestion.prompt,
+      selectedAnswer: historicalQuestion.options[(historicalQuestion.answer + 1) % 4],
+      correctAnswer: historicalQuestion.options[historicalQuestion.answer],
+      explanation: historicalQuestion.explanation,
+      wrongCount: 1,
+      lastWrongAt: '2026-07-28T00:00:00.000Z',
+      reviewStage: 0,
+      nextReviewAt: '2026-07-28T00:00:00.000Z',
+      status: '待复习',
+    }]))
+    render(<App />)
+
+    for (let index = 0; index < 5; index += 1) {
+      const question = createVocabularyQuestion(fallbackKaoyanWords, fallbackKaoyanIds[index], 'word-zh', 'practice')
+      fireEvent.click(screen.getByRole('button', { name: question.options[question.answer] }))
+      fireEvent.click(screen.getByRole('button', { name: index === 4 ? /查看阶段自测/ : /下一题/ }))
+    }
+
+    expect(screen.getByText('本轮 5 / 5，并加入 1 道历史待复习题。')).toBeInTheDocument()
+    expect(screen.getByText('历史')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /开始自测/ }))
+    expect(screen.getByText(historicalQuestion.prompt)).toBeInTheDocument()
+  })
+
+  it('keeps reading vocabulary hints available but hides them during a self-test', async () => {
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: /打开生词提示/ }))
+    fireEvent.click(screen.getByRole('button', { name: '提示一个' }))
+
+    expect(screen.getByText(questionById.get(questionIds[0])!.english)).toBeInTheDocument()
+    expect(document.querySelectorAll('.vocabulary-list > li')).toHaveLength(1)
+    await waitFor(() => expect(screen.getByRole('button', { name: /在线词典/ })).toBeInTheDocument())
+  })
+
+  it('uses the generated fallback data from the ECDICT snapshot', () => {
+    expect(bundledVocabularyWords.length).toBeGreaterThanOrEqual(25)
+    expect(new Set(bundledVocabularyWords.flatMap((word) => word.tags))).toEqual(
+      new Set(['cet4', 'cet6', 'ky', 'ielts', 'toefl']),
+    )
   })
 })

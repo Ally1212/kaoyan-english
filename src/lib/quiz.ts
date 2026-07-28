@@ -1,3 +1,5 @@
+import type { Question } from '../data/questions'
+
 export interface QuizProgress {
   version: 1
   order: string[]
@@ -5,6 +7,24 @@ export interface QuizProgress {
   answered: number
   correct: number
   selectedIndex: number | null
+}
+
+export function createReadingQuestion(
+  question: Question,
+  pass: 'practice' | 'review',
+): Question {
+  if (pass === 'practice') return question
+
+  const correctAnswer = question.options[question.answer]
+  const answer = ((question.answer + 1) % 4) as 0 | 1 | 2 | 3
+  const options = question.options.filter((_, index) => index !== question.answer)
+  options.splice(answer, 0, correctAnswer)
+
+  return {
+    ...question,
+    options: options as [string, string, string, string],
+    answer,
+  }
 }
 
 export function shuffleIds(ids: string[], random: () => number = Math.random): string[] {
@@ -22,8 +42,18 @@ export function createOrder(
   ids: string[],
   previousId?: string,
   random: () => number = Math.random,
+  getWeight?: (id: string) => number,
 ): string[] {
-  const order = shuffleIds(ids, random)
+  const order = getWeight
+    ? ids
+        .map((id, index) => {
+          const weight = Math.max(Number.EPSILON, getWeight(id))
+          const sample = Math.min(1 - Number.EPSILON, Math.max(Number.EPSILON, random()))
+          return { id, index, key: -Math.log(sample) / weight }
+        })
+        .sort((left, right) => left.key - right.key || left.index - right.index)
+        .map(({ id }) => id)
+    : shuffleIds(ids, random)
 
   if (order.length > 1 && previousId && order[0] === previousId) {
     ;[order[0], order[1]] = [order[1], order[0]]
@@ -35,10 +65,11 @@ export function createOrder(
 export function createProgress(
   ids: string[],
   random: () => number = Math.random,
+  getWeight?: (id: string) => number,
 ): QuizProgress {
   return {
     version: 1,
-    order: createOrder(ids, undefined, random),
+    order: createOrder(ids, undefined, random, getWeight),
     cursor: 0,
     answered: 0,
     correct: 0,
@@ -96,6 +127,7 @@ export function advanceProgress(
   ids: string[],
   random: () => number = Math.random,
   roundLength: number = ids.length,
+  getWeight?: (id: string) => number,
 ): QuizProgress {
   const finalCursor = Math.min(progress.order.length, Math.max(1, roundLength)) - 1
 
@@ -111,7 +143,7 @@ export function advanceProgress(
 
   return {
     ...progress,
-    order: createOrder(ids, previousId, random),
+    order: createOrder(ids, previousId, random, getWeight),
     cursor: 0,
     selectedIndex: null,
   }
